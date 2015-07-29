@@ -1,2 +1,4 @@
-# malaria-evolution-viz
 Visualization of Malaria parasite genome evolution
+
+Collaboration with https://github.com/zmartine
+
