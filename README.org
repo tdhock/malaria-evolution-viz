@@ -2,3 +2,20 @@ Visualization of Malaria parasite genome evolution
 
 Collaboration with https://github.com/zmartine
 
+** 30 July 2015
+
+http://bl.ocks.org/tdhock/raw/1766985f3c78e4551119/
+
+Plotted QUAL threshold error curves and chromosomes.
+
+** TODO
+
+exclude outliers?
+
+plot error curves for other quality metrics?
+
+dotplots of fp/fn versus chromosomal position for every amplicon
+(maybe facets or showSelected).
+
+plot HDR status as dot outline in chrom plot, and as a shaded band in
+the dotplots.

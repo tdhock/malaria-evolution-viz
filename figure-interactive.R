@@ -130,6 +130,6 @@ viz <-
 
        title="Malaria parasite NextGenSeq variant calling errors")
 
-animint2dir(viz)
+animint2dir(viz, "figure-interactive")
 
-animint2gist(viz)
+##animint2gist(viz)
