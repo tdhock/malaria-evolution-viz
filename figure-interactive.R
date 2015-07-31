@@ -5,12 +5,20 @@ works_with_R("3.2.1",
 
 load("variants.RData")
 
+filterVar <- "QUAL"
+
 ptab <- table(variants$POS)
 duplicated.pos <- ptab[1 < ptab]
 variants[POS %in% as.integer(names(duplicated.pos))]
 
 variants[, `:=`(pos.fac=factor(POS, POS),
                 LOCUS_ID=factor(LOCUS_ID, unique(LOCUS_ID)))]
+variants$filterVar <- variants[[filterVar]]
+
+filterVar.thresh.vec <-
+  seq(min(variants$filterVar, na.rm=TRUE),
+      max(variants$filterVar, na.rm=TRUE),
+      l=40)
 
 amp.coding.counts <- with(variants, table(LOCUS_ID, Coding))
 
@@ -127,21 +135,22 @@ unfiltered.fn <- sum(variants$Validation == "FN")
 
 error.curves.list <- list()
 amplicon.errors.list <- list()
-QUAL.labels.list <- list()
+filterVar.labels.list <- list()
 filtered.variants.list <- list()
-for(QUAL.thresh in seq(3, 225, l=40)){
-  QUAL.labels.list[[paste(QUAL.thresh)]] <-
-    data.table(QUAL.thresh, chrom="PyYM_07_v1", position=2e6)
+for(filterVar.thresh in filterVar.thresh.vec){
+  filterVar.labels.list[[paste(filterVar.thresh)]] <-
+    data.table(filterVar.thresh, chrom="PyYM_07_v1", position=2e6)
   
-  labeled.variants <- data.table(QUAL.thresh, variants)
-  labeled.variants[, call:=ifelse(QUAL.thresh < QUAL, "variant", "filtered")]
+  labeled.variants <- data.table(filterVar.thresh, variants)
+  labeled.variants[, call:=ifelse(filterVar.thresh < filterVar,
+                       "variant", "filtered")]
   labeled.variants[, error.type:=ifelse(is.na(call), "fn",
                        ifelse(call=="variant",
                               ifelse(Validation=="TP", "tp", "fp"),
                               ifelse(Validation=="TP", "fn", "tn")))]
-  filtered.variants.list[[paste(QUAL.thresh)]] <- labeled.variants
+  filtered.variants.list[[paste(filterVar.thresh)]] <- labeled.variants
   
-  variants.above <- variants[QUAL.thresh < QUAL, ]
+  variants.above <- variants[filterVar.thresh < filterVar, ]
   amplicon.status <- data.frame(amplicons)
   amplicon.status$filtered.tp <- 0
   amplicon.status$fp <- 0
@@ -159,8 +168,8 @@ for(QUAL.thresh in seq(3, 225, l=40)){
   amplicon.status$fn <-
     with(amplicon.status, unfiltered.fn + filtered.fn)
   amplicon.status$errors <- with(amplicon.status, fn + fp)
-  amplicon.errors.list[[paste(QUAL.thresh)]] <-
-    data.table(QUAL.thresh, amplicon.status)
+  amplicon.errors.list[[paste(filterVar.thresh)]] <-
+    data.table(filterVar.thresh, amplicon.status)
   
   fp <- with(amplicon.status, sum(fp))
   fn <- with(amplicon.status, sum(fn))
@@ -172,32 +181,33 @@ for(QUAL.thresh in seq(3, 225, l=40)){
     offset <-
       ifelse(metric.name=="errors", 10,
              ifelse(metric.name=="fp", fp.offset, fn.offset))
-    error.curves.list[[paste(QUAL.thresh, metric.name)]] <-
-      data.table(QUAL.thresh, metric.name, metric.value, offset)
+    error.curves.list[[paste(filterVar.thresh, metric.name)]] <-
+      data.table(filterVar.thresh, metric.name, metric.value, offset)
   }
 }
 filtered.variants <- do.call(rbind, filtered.variants.list)
 amplicon.errors <- do.call(rbind, amplicon.errors.list)
 error.curves <- do.call(rbind, error.curves.list)
-QUAL.labels <- do.call(rbind, QUAL.labels.list)
+filterVar.labels <- do.call(rbind, filterVar.labels.list)
 
-thresh.30 <- with(error.curves, QUAL.thresh[which.min(abs(QUAL.thresh - 30))])
+thresh.30 <- with(error.curves, filterVar.thresh[which.min(abs(filterVar.thresh - 30))])
 
 viz <-
   list(errorCurves=ggplot()+
-         ggtitle("error curves, select QUAL threshold")+
-         xlab("QUAL threshold")+
+         ggtitle(paste("error curves, select",
+                       filterVar, "threshold"))+
+         xlab(paste(filterVar, "threshold"))+
          ylab("incorrectly called variants")+
-         make_tallrect(error.curves, "QUAL.thresh")+
-         geom_line(aes(QUAL.thresh, metric.value,
+         make_tallrect(error.curves, "filterVar.thresh")+
+         geom_line(aes(filterVar.thresh, metric.value,
                        group=metric.name,
                        color=metric.name),
                    data=error.curves)+
          scale_color_manual(values=fp.fn.colors)+
-         geom_text(aes(QUAL.thresh, metric.value+offset,
+         geom_text(aes(filterVar.thresh, metric.value+offset,
                        color=metric.name,
                        label=paste(metric.value, metric.name, " "),
-                       showSelected=QUAL.thresh),
+                       showSelected=filterVar.thresh),
                    hjust=1,
                    data=error.curves),
 
@@ -205,15 +215,16 @@ viz <-
          ggtitle("Sanger sequenced amplicons")+
          theme_animint(width=600)+
          geom_text(aes(chrom2int(chrom), position/1e3,
-                       label=sprintf("QUAL threshold = %.1f", QUAL.thresh),
-                       showSelected=QUAL.thresh),
-                   data=QUAL.labels)+
+                       label=sprintf("%s threshold = %.1f",
+                         filterVar, filterVar.thresh),
+                       showSelected=filterVar.thresh),
+                   data=filterVar.labels)+
          geom_text(aes(chrom2int(chrom), position/1e3,
                        label=paste(fp, "fp_"),
                        clickSelects=LOCUS_ID,
                        showSelected3=annotation,
                        showSelected2=highly.divergent.regions,
-                       showSelected=QUAL.thresh),
+                       showSelected=filterVar.thresh),
                    hjust=1,
                    color=fp.fn.colors[["fp"]],
                    data=subset(amplicon.errors, fp != 0))+
@@ -222,7 +233,7 @@ viz <-
                        clickSelects=LOCUS_ID,
                        showSelected3=annotation,
                        showSelected2=highly.divergent.regions,
-                       showSelected=QUAL.thresh),
+                       showSelected=filterVar.thresh),
                    color=fp.fn.colors[["fn"]],
                    hjust=0,
                    data=subset(amplicon.errors, fn != 0))+
@@ -268,14 +279,14 @@ viz <-
                       size=8,
                       data=regions)+
          geom_point(aes(normalize(LOCUS_ID, POS), LOCUS_ID,
-                        showSelected=QUAL.thresh,
+                        showSelected=filterVar.thresh,
                         fill=error.type),
                     color="black",
                     pch=21,
                     size=4,
                     data=filtered.variants),
 
-       first=list(QUAL.thresh=thresh.30),
+       first=list(filterVar.thresh=thresh.30),
 
        title="Malaria parasite NextGenSeq variant calling errors")
 
