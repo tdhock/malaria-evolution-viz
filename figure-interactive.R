@@ -5,19 +5,12 @@ works_with_R("3.2.1",
 
 load("variants.RData")
 
-unique.or.multiple <- function(x)
+ptab <- table(variants$POS)
+duplicated.pos <- ptab[1 < ptab]
+variants[POS %in% as.integer(names(duplicated.pos))]
 
-HDR.LCR <- variants[["HDR/LCR"]]
-getRegions <- function(region.type){
-  v.diff <- diff(HDR.LCR==region.type)
-  HDR.starts <- which(v.diff==1)+1
-  HDR.ends <- which(v.diff==-1)
-  data.table(chromStart=variants$POS[HDR.starts],
-             chromEnd=variants$POS[HDR.ends],
-             LOCUS_ID=variants$LOCUS_ID[HDR.ends],
-             region.type)
-}
-regions <- rbind(getRegions("HDR"), getRegions("LCR"))
+variants[, `:=`(pos.fac=factor(POS, POS),
+                LOCUS_ID=factor(LOCUS_ID, unique(LOCUS_ID)))]
 
 amp.coding.counts <- with(variants, table(LOCUS_ID, Coding))
 
@@ -30,8 +23,8 @@ unique.or.multiple <- function(x){
   }
 }
 
-amplicons <- variants[, .(chromStart=min(POS),
-                          chromEnd=max(POS),
+amplicons <- variants[, .(firstVariant=min(POS),
+                          lastVariant=max(POS),
                           annotation=unique.or.multiple(Coding),
                           region.type={
                             if(all(`HDR/LCR` == ".")){
@@ -46,11 +39,73 @@ amplicons <- variants[, .(chromStart=min(POS),
                           unfiltered.tp=sum(Validation=="TP"),
                           unfiltered.fn=sum(Validation=="FN"),
                           chrom=CHROM[1]),
-                      by=LOCUS_ID][, 
-                          position := as.integer((chromStart+chromEnd)/2),
-                        ]
-amplicons[, highly.divergent.regions :=
-            ifelse(region.type==".", "none", "some")]
+                      by=LOCUS_ID][, `:=`(
+                        position=as.integer((firstVariant+lastVariant)/2),
+                        highly.divergent.regions=
+                          ifelse(region.type==".", "none", "some")
+                        )]
+setkey(amplicons, LOCUS_ID)
+
+HDR.LCR <- variants[["HDR/LCR"]]
+getRegions <- function(region.type){
+  v.diff <- diff(HDR.LCR==region.type)
+  HDR.starts <- which(v.diff==1)+1
+  HDR.ends <- which(v.diff==-1)
+  LOCUS_ID <- variants$LOCUS_ID[HDR.ends]
+  data.table(LOCUS_ID,
+             regionStart=variants$POS[HDR.starts],
+             regionEnd=variants$POS[HDR.ends],
+             region.type)
+}
+regions <- rbind(getRegions("HDR"), getRegions("LCR"))
+
+normalize <- function(LOCUS_ID, position){
+  LID <- paste(LOCUS_ID)
+  firstVariant <- amplicons[LID, ]$firstVariant
+  lastVariant <- amplicons[LID, ]$lastVariant
+  bases <- lastVariant-firstVariant
+  (position-firstVariant)/bases
+}
+
+ggplot()+
+  geom_point(aes(POS, Validation),
+             data=variants)+
+  facet_grid(. ~ LOCUS_ID, scales="free")+
+  theme_bw()+
+  theme(panel.margin=grid::unit(0, "cm"))
+
+ggplot()+
+  geom_point(aes(normalize(LOCUS_ID, POS), Validation),
+             data=variants)+
+  facet_grid(. ~ LOCUS_ID)+
+  theme_bw()+
+  theme(panel.margin=grid::unit(0, "cm"))
+
+fp.fn.colors <- c(FP="skyblue",
+                  fp="skyblue",
+                  fn="#E41A1C",
+                  FN="#E41A1C",
+                  TP="white",
+                  errors="black")
+fp.fn.linetypes <- c(errors="solid",
+                     false.positive="solid",
+                     false.negative="solid",
+                     imprecision="dashed")
+fp.fn.sizes <- c(errors=1,
+                 false.positive=3,
+                 false.negative=3,
+                 imprecision=1)/1.2
+ggplot()+
+  scale_fill_manual(values=fp.fn.colors)+
+  geom_segment(aes(normalize(LOCUS_ID, regionStart), LOCUS_ID,
+                   xend=normalize(LOCUS_ID, regionEnd), yend=LOCUS_ID,
+                   color=region.type),
+               data=regions)+
+  geom_point(aes(normalize(LOCUS_ID, POS), LOCUS_ID,
+                 fill=Validation),
+             color="black",
+             pch=21,
+             data=variants)
 
 chrom2int <- function(chrom){
   only.num <- sub("PyYM_([0-9]{2})_v1", "\\1", chrom)
@@ -63,10 +118,12 @@ unfiltered.fn <- sum(variants$Validation == "FN")
 error.curves.list <- list()
 amplicon.errors.list <- list()
 QUAL.labels.list <- list()
+filtered.variants.list <- list()
 for(QUAL.thresh in seq(3, 225, l=40)){
   QUAL.labels.list[[paste(QUAL.thresh)]] <-
     data.table(QUAL.thresh, chrom="PyYM_07_v1", position=2e6)
   variants.above <- variants[QUAL.thresh < QUAL, ]
+  filtered.variants.list[[paste(QUAL.thresh)]] <- variants.above
   amplicon.status <- data.frame(amplicons)
   amplicon.status$filtered.tp <- 0
   amplicon.status$fp <- 0
@@ -75,9 +132,9 @@ for(QUAL.thresh in seq(3, 225, l=40)){
     variants.above[, .(fp=sum(Validation=="FP"),
                        filtered.tp=sum(Validation=="TP")),
                    by=LOCUS_ID]
-  amplicon.status[locus.fp.tp$LOCUS_ID, "filtered.tp"] <-
+  amplicon.status[paste(locus.fp.tp$LOCUS_ID), "filtered.tp"] <-
     locus.fp.tp$filtered.tp
-  amplicon.status[locus.fp.tp$LOCUS_ID, "fp"] <-
+  amplicon.status[paste(locus.fp.tp$LOCUS_ID), "fp"] <-
     locus.fp.tp$fp
   amplicon.status$filtered.fn <-
     with(amplicon.status, unfiltered.tp - filtered.tp)
@@ -101,6 +158,7 @@ for(QUAL.thresh in seq(3, 225, l=40)){
       data.table(QUAL.thresh, metric.name, metric.value, offset)
   }
 }
+filtered.variants <- do.call(rbind, filtered.variants.list)
 amplicon.errors <- do.call(rbind, amplicon.errors.list)
 error.curves <- do.call(rbind, error.curves.list)
 QUAL.labels <- do.call(rbind, QUAL.labels.list)
@@ -117,6 +175,7 @@ viz <-
                        group=metric.name,
                        color=metric.name),
                    data=error.curves)+
+         scale_color_manual(values=fp.fn.colors)+
          geom_text(aes(QUAL.thresh, metric.value+offset,
                        color=metric.name,
                        label=paste(metric.value, metric.name, " "),
@@ -170,6 +229,6 @@ animint2dir(viz, "figure-interactive")
 ## BUG: metric.name and highly.divergent.regions legend entries do not
 ## fade to opacity: 0.5 after clicking.
 
-##
+## BUG: HDR color legend shows fill not stroke!
 
 ##animint2gist(viz)
