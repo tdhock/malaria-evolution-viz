@@ -85,7 +85,8 @@ fp.fn.colors <- c(FP="skyblue",
                   fp="skyblue",
                   fn="#E41A1C",
                   FN="#E41A1C",
-                  TP="white",
+                  tn="white",
+                  tp="grey",
                   errors="black")
 fp.fn.linetypes <- c(errors="solid",
                      false.positive="solid",
@@ -98,6 +99,14 @@ fp.fn.sizes <- c(errors=1,
 ggplot()+
   scale_fill_manual(values=fp.fn.colors)+
   scale_y_discrete(drop=FALSE)+
+  geom_text(aes(normalize(LOCUS_ID, firstVariant), LOCUS_ID,
+                label=paste0(firstVariant, "_")),
+            hjust=1,
+            data=amplicons)+
+  geom_text(aes(normalize(LOCUS_ID, lastVariant), LOCUS_ID,
+                label=paste0("_", lastVariant)),
+            hjust=0,
+            data=amplicons)+
   geom_segment(aes(normalize(LOCUS_ID, regionStart), LOCUS_ID,
                    xend=normalize(LOCUS_ID, regionEnd), yend=LOCUS_ID,
                    color=region.type),
@@ -123,8 +132,16 @@ filtered.variants.list <- list()
 for(QUAL.thresh in seq(3, 225, l=40)){
   QUAL.labels.list[[paste(QUAL.thresh)]] <-
     data.table(QUAL.thresh, chrom="PyYM_07_v1", position=2e6)
+  
+  labeled.variants <- data.table(QUAL.thresh, variants)
+  labeled.variants[, call:=ifelse(QUAL.thresh < QUAL, "variant", "filtered")]
+  labeled.variants[, error.type:=ifelse(is.na(call), "fn",
+                       ifelse(call=="variant",
+                              ifelse(Validation=="TP", "tp", "fp"),
+                              ifelse(Validation=="TP", "fn", "tn")))]
+  filtered.variants.list[[paste(QUAL.thresh)]] <- labeled.variants
+  
   variants.above <- variants[QUAL.thresh < QUAL, ]
-  filtered.variants.list[[paste(QUAL.thresh)]] <- variants.above
   amplicon.status <- data.frame(amplicons)
   amplicon.status$filtered.tp <- 0
   amplicon.status$fp <- 0
@@ -167,7 +184,7 @@ QUAL.labels <- do.call(rbind, QUAL.labels.list)
 thresh.30 <- with(error.curves, QUAL.thresh[which.min(abs(QUAL.thresh - 30))])
 
 viz <-
-  list(errors=ggplot()+
+  list(errorCurves=ggplot()+
          ggtitle("error curves, select QUAL threshold")+
          xlab("QUAL threshold")+
          ylab("incorrectly called variants")+
@@ -223,6 +240,41 @@ viz <-
                           drop=FALSE)+
          ylab("position on chromosome (kilo bases = kb)"),
 
+       variants=ggplot()+
+         ggtitle("Variants in each sanger sequenced amplicon")+
+         theme_animint(width=1000, height=600)+
+         scale_fill_manual(values=fp.fn.colors)+
+         scale_y_discrete("amplicon LOCUS_ID", drop=FALSE)+
+         scale_x_continuous("relative position on amplicon",
+                            limits=c(-0.05, 1.05),
+                            breaks=c())+
+         geom_text(aes(normalize(LOCUS_ID, firstVariant), LOCUS_ID,
+                       label=paste0(firstVariant, "_")),
+                   hjust=1,
+                   data=amplicons)+
+         geom_text(aes(normalize(LOCUS_ID, lastVariant), LOCUS_ID,
+                       label=paste0("_", lastVariant)),
+                   hjust=0,
+                   data=amplicons)+
+         geom_segment(aes(normalize(LOCUS_ID, firstVariant), LOCUS_ID,
+                          xend=normalize(LOCUS_ID, lastVariant), yend=LOCUS_ID,
+                          clickSelects=LOCUS_ID),
+                      size=12,
+                      alpha=0.5,
+                      data=amplicons)+
+         geom_segment(aes(normalize(LOCUS_ID, regionStart), LOCUS_ID,
+                          xend=normalize(LOCUS_ID, regionEnd), yend=LOCUS_ID,
+                          color=region.type),
+                      size=8,
+                      data=regions)+
+         geom_point(aes(normalize(LOCUS_ID, POS), LOCUS_ID,
+                        showSelected=QUAL.thresh,
+                        fill=error.type),
+                    color="black",
+                    pch=21,
+                    size=4,
+                    data=filtered.variants),
+
        first=list(QUAL.thresh=thresh.30),
 
        title="Malaria parasite NextGenSeq variant calling errors")
@@ -233,6 +285,9 @@ animint2dir(viz, "figure-interactive")
 ## fade to opacity: 0.5 after clicking.
 
 ## BUG: HDR color legend shows fill not stroke!
+
+## BUG: LCR region.type does not show up at first (but it does after
+## clicking the region.type legend).
 
 ##animint2gist(viz)
 
