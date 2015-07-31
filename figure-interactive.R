@@ -5,7 +5,10 @@ works_with_R("3.2.1",
 
 load("variants.RData")
 
+filterVar <- "DP"
 filterVar <- "QUAL"
+filterVar <- "FQ"
+filterVar <- "MQ"
 
 ptab <- table(variants$POS)
 duplicated.pos <- ptab[1 < ptab]
