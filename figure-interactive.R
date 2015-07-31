@@ -293,7 +293,7 @@ viz <-
                           showSelected2=annotation,
                           clickSelects=LOCUS_ID),
                       size=12,
-                      alpha=0.5,
+                      alpha=0.6,
                       data=amplicons)+
          geom_segment(aes(normalize(LOCUS_ID, regionStart), LOCUS_ID,
                           xend=normalize(LOCUS_ID, regionEnd), yend=LOCUS_ID,
@@ -302,7 +302,17 @@ viz <-
                           color=region.type),
                       size=8,
                       data=add.legend.vars(regions))+
+         scale_color_manual(values=c("#E41A1C", #red
+                              "#377EB8", #blue
+                              "#4DAF4A", #green
+                              "#984EA3", #purple
+                              "#FF7F00", #orange
+                              LCR="#FFFF33", #yellow
+                              "#A65628",
+                              "#F781BF",
+                                     HDR="black"))+
          geom_point(aes(normalize(LOCUS_ID, POS), LOCUS_ID,
+                        tooltip=paste(Coding, Variant_type),
                         showSelected=highly.divergent.regions,
                         showSelected2=annotation,
                         showSelected3=filterVar.thresh,
