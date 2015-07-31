@@ -74,8 +74,12 @@ normalize <- function(LOCUS_ID, position){
   LID <- paste(LOCUS_ID)
   firstVariant <- amplicons[LID, ]$firstVariant
   lastVariant <- amplicons[LID, ]$lastVariant
-  bases <- lastVariant-firstVariant
-  (position-firstVariant)/bases
+  mid <- (firstVariant+lastVariant)/2
+  left <- firstVariant
+  left <- mid-200
+  right <- mid+200
+  bases <- right - left
+  (position-left)/bases
 }
 
 ggplot()+
@@ -193,7 +197,15 @@ amplicon.errors <- do.call(rbind, amplicon.errors.list)
 error.curves <- do.call(rbind, error.curves.list)
 filterVar.labels <- do.call(rbind, filterVar.labels.list)
 
-thresh.30 <- with(error.curves, filterVar.thresh[which.min(abs(filterVar.thresh - 30))])
+only.errors <- error.curves[metric.name=="errors", ]
+best.thresh <-
+  only.errors[which.min(metric.value), ]$filterVar.thresh
+
+add.legend.vars <- function(dt){
+  LID <- paste(dt$LOCUS_ID)
+  legend.vars <- amplicons[LID, .(highly.divergent.regions, annotation)]
+  data.table(dt, legend.vars)
+}
 
 viz <-
   list(errorCurves=ggplot()+
@@ -263,33 +275,44 @@ viz <-
                             limits=c(-0.05, 1.05),
                             breaks=c())+
          geom_text(aes(normalize(LOCUS_ID, firstVariant), LOCUS_ID,
+                       showSelected=highly.divergent.regions,
+                       showSelected2=annotation,
                        label=paste0(firstVariant, "_")),
                    hjust=1,
                    data=amplicons)+
          geom_text(aes(normalize(LOCUS_ID, lastVariant), LOCUS_ID,
-                       label=paste0("_", lastVariant)),
+                       showSelected=highly.divergent.regions,
+                       showSelected2=annotation,
+                       label=paste0("_", lastVariant, " --- ",
+                                    lastVariant-firstVariant, " bases")),
                    hjust=0,
                    data=amplicons)+
          geom_segment(aes(normalize(LOCUS_ID, firstVariant), LOCUS_ID,
                           xend=normalize(LOCUS_ID, lastVariant), yend=LOCUS_ID,
+                          showSelected=highly.divergent.regions,
+                          showSelected2=annotation,
                           clickSelects=LOCUS_ID),
                       size=12,
                       alpha=0.5,
                       data=amplicons)+
          geom_segment(aes(normalize(LOCUS_ID, regionStart), LOCUS_ID,
                           xend=normalize(LOCUS_ID, regionEnd), yend=LOCUS_ID,
+                          showSelected=highly.divergent.regions,
+                          showSelected2=annotation,
                           color=region.type),
                       size=8,
-                      data=regions)+
+                      data=add.legend.vars(regions))+
          geom_point(aes(normalize(LOCUS_ID, POS), LOCUS_ID,
-                        showSelected=filterVar.thresh,
+                        showSelected=highly.divergent.regions,
+                        showSelected2=annotation,
+                        showSelected3=filterVar.thresh,
                         fill=error.type),
                     color="black",
                     pch=21,
                     size=4,
-                    data=filtered.variants),
+                    data=add.legend.vars(filtered.variants)),
 
-       first=list(filterVar.thresh=thresh.30),
+       first=list(filterVar.thresh=best.thresh),
 
        title="Malaria parasite NextGenSeq variant calling errors")
 
