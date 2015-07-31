@@ -97,6 +97,7 @@ fp.fn.sizes <- c(errors=1,
                  imprecision=1)/1.2
 ggplot()+
   scale_fill_manual(values=fp.fn.colors)+
+  scale_y_discrete(drop=FALSE)+
   geom_segment(aes(normalize(LOCUS_ID, regionStart), LOCUS_ID,
                    xend=normalize(LOCUS_ID, regionEnd), yend=LOCUS_ID,
                    color=region.type),
@@ -197,6 +198,7 @@ viz <-
                        showSelected2=highly.divergent.regions,
                        showSelected=QUAL.thresh),
                    hjust=1,
+                   color=fp.fn.colors[["fp"]],
                    data=subset(amplicon.errors, fp != 0))+
          geom_text(aes(chrom2int(chrom), position/1e3,
                        label=paste0("_" , fn, " fn"),
@@ -204,6 +206,7 @@ viz <-
                        showSelected3=annotation,
                        showSelected2=highly.divergent.regions,
                        showSelected=QUAL.thresh),
+                   color=fp.fn.colors[["fn"]],
                    hjust=0,
                    data=subset(amplicon.errors, fn != 0))+
          geom_segment(aes(chrom2int(chrom), 0, 
@@ -232,3 +235,4 @@ animint2dir(viz, "figure-interactive")
 ## BUG: HDR color legend shows fill not stroke!
 
 ##animint2gist(viz)
+
