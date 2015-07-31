@@ -5,18 +5,42 @@ works_with_R("3.2.1",
 
 load("variants.RData")
 
-names(variants)[1] <- "CHROM"
+unique.or.multiple <- function(x)
+
+HDR.LCR <- variants[["HDR/LCR"]]
+getRegions <- function(region.type){
+  v.diff <- diff(HDR.LCR==region.type)
+  HDR.starts <- which(v.diff==1)+1
+  HDR.ends <- which(v.diff==-1)
+  data.table(chromStart=variants$POS[HDR.starts],
+             chromEnd=variants$POS[HDR.ends],
+             LOCUS_ID=variants$LOCUS_ID[HDR.ends],
+             region.type)
+}
+regions <- rbind(getRegions("HDR"), getRegions("LCR"))
 
 amp.coding.counts <- with(variants, table(LOCUS_ID, Coding))
 
+unique.or.multiple <- function(x){
+  u <- unique(paste(x))
+  if(length(u) == 1){
+    u
+  }else{
+    "multiple"
+  }
+}
+
 amplicons <- variants[, .(chromStart=min(POS),
                           chromEnd=max(POS),
-                          annotation={
-                            u <- unique(paste(Coding))
-                            if(length(u) == 1){
-                              u
+                          annotation=unique.or.multiple(Coding),
+                          region.type={
+                            if(all(`HDR/LCR` == ".")){
+                              "."
                             }else{
-                              "multiple"
+                              not.dot <- `HDR/LCR`[`HDR/LCR` != "."]
+                              ##unique.or.multiple(not.dot)
+                              u <- sort(unique(not.dot))
+                              paste(u, collapse="/")
                             }
                           },
                           unfiltered.tp=sum(Validation=="TP"),
@@ -24,7 +48,9 @@ amplicons <- variants[, .(chromStart=min(POS),
                           chrom=CHROM[1]),
                       by=LOCUS_ID][, 
                           position := as.integer((chromStart+chromEnd)/2),
-                        ]                        
+                        ]
+amplicons[, highly.divergent.regions :=
+            ifelse(region.type==".", "none", "some")]
 
 chrom2int <- function(chrom){
   only.num <- sub("PyYM_([0-9]{2})_v1", "\\1", chrom)
@@ -119,9 +145,11 @@ viz <-
                           yend=bases/1e3, xend=chrom2int(chrom)),
                       data=YM_Chr)+
          geom_point(aes(chrom2int(chrom), position/1e3,
-                        color=annotation),
+                        color=highly.divergent.regions,
+                        fill=annotation),
                     size=5,
                     data=amplicons)+
+         scale_color_manual(values=c(none="white", some="black"))+
          scale_x_discrete("Malaria parasite yoelii yoelii chromosome",
                           drop=FALSE)+
          ylab("position on chromosome (kilo bases = kb)"),
