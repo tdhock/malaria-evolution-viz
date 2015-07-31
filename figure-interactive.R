@@ -133,11 +133,17 @@ viz <-
                    data=QUAL.labels)+
          geom_text(aes(chrom2int(chrom), position/1e3,
                        label=paste(fp, "fp_"),
+                       clickSelects=LOCUS_ID,
+                       showSelected3=annotation,
+                       showSelected2=highly.divergent.regions,
                        showSelected=QUAL.thresh),
                    hjust=1,
                    data=subset(amplicon.errors, fp != 0))+
          geom_text(aes(chrom2int(chrom), position/1e3,
                        label=paste0("_" , fn, " fn"),
+                       clickSelects=LOCUS_ID,
+                       showSelected3=annotation,
+                       showSelected2=highly.divergent.regions,
                        showSelected=QUAL.thresh),
                    hjust=0,
                    data=subset(amplicon.errors, fn != 0))+
@@ -146,7 +152,8 @@ viz <-
                       data=YM_Chr)+
          geom_point(aes(chrom2int(chrom), position/1e3,
                         color=highly.divergent.regions,
-                        fill=annotation),
+                        fill=annotation,
+                        clickSelects=LOCUS_ID),
                     size=5,
                     data=amplicons)+
          scale_color_manual(values=c(none="white", some="black"))+
@@ -159,5 +166,10 @@ viz <-
        title="Malaria parasite NextGenSeq variant calling errors")
 
 animint2dir(viz, "figure-interactive")
+
+## BUG: metric.name and highly.divergent.regions legend entries do not
+## fade to opacity: 0.5 after clicking.
+
+##
 
 ##animint2gist(viz)
