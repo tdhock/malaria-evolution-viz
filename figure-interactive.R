@@ -47,8 +47,6 @@ amplicons <- variants[, .(firstVariant=min(POS),
                               paste(u, collapse="/")
                             }
                           },
-                          unfiltered.tp=sum(Validation=="TP"),
-                          unfiltered.fn=sum(Validation=="FN"),
                           chrom=CHROM[1]),
                       by=LOCUS_ID][, `:=`(
                         position=as.integer((firstVariant+lastVariant)/2),
@@ -137,9 +135,6 @@ chrom2int <- function(chrom){
   factor(as.integer(only.num), 1:14)
 }
 
-unfiltered.tp <- sum(variants$Validation == "TP")
-unfiltered.fn <- sum(variants$Validation == "FN")
-
 error.curves.list <- list()
 amplicon.errors.list <- list()
 filterVar.labels.list <- list()
@@ -156,25 +151,14 @@ for(filterVar.thresh in filterVar.thresh.vec){
                               ifelse(Validation=="TP", "tp", "fp"),
                               ifelse(Validation=="TP", "fn", "tn")))]
   filtered.variants.list[[paste(filterVar.thresh)]] <- labeled.variants
+
+  amplicon.fp.fn <- 
+    labeled.variants[, .(fp=sum(error.type=="fp"),
+                         fn=sum(error.type=="fn")),
+                     by=LOCUS_ID]
   
   variants.above <- variants[filterVar.thresh < filterVar, ]
-  amplicon.status <- data.frame(amplicons)
-  amplicon.status$filtered.tp <- 0
-  amplicon.status$fp <- 0
-  rownames(amplicon.status) <- amplicon.status$LOCUS_ID
-  locus.fp.tp <-
-    variants.above[, .(fp=sum(Validation=="FP"),
-                       filtered.tp=sum(Validation=="TP")),
-                   by=LOCUS_ID]
-  amplicon.status[paste(locus.fp.tp$LOCUS_ID), "filtered.tp"] <-
-    locus.fp.tp$filtered.tp
-  amplicon.status[paste(locus.fp.tp$LOCUS_ID), "fp"] <-
-    locus.fp.tp$fp
-  amplicon.status$filtered.fn <-
-    with(amplicon.status, unfiltered.tp - filtered.tp)
-  amplicon.status$fn <-
-    with(amplicon.status, unfiltered.fn + filtered.fn)
-  amplicon.status$errors <- with(amplicon.status, fn + fp)
+  amplicon.status <- amplicons[amplicon.fp.fn, ]
   amplicon.errors.list[[paste(filterVar.thresh)]] <-
     data.table(filterVar.thresh, amplicon.status)
   
