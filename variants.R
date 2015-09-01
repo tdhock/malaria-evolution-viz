@@ -2,6 +2,10 @@ works_with_R("3.2.1", data.table="1.9.5")
 
 unfiltered <- fread("N67toYMaug_22Feb13_reflist_2June14_eBAQ_MASTER_NOChr2_fullhomhet_annotated_for_Toby.txt")
 
+variant.intervals <- fread("variant_intervals_for_Toby.txt")
+variant.intervals[, bases := Stop - Start]
+variant.intervals[, LOCUS_ID := factor(LOCUS_ID, LOCUS_ID)]
+
 variants <- unfiltered
 names(variants)[1] <- "CHROM"
 
@@ -45,4 +49,4 @@ names(variants)[1] <- "CHROM"
 YM_Chr <- fread("YM_Chr.bed.txt")
 setnames(YM_Chr, c("chrom", "bases"))
 
-save(YM_Chr, variants, file="variants.RData")
+save(YM_Chr, variants, variant.intervals, file="variants.RData")

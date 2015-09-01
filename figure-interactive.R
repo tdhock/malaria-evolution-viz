@@ -1,7 +1,7 @@
 works_with_R("3.2.1",
              data.table="1.9.5",
              "tdhock/ggplot2@a8b06ddb680acdcdbd927773b1011c562134e4d2",
-             "tdhock/animint@f7d47b5a9b019fc3b12c0aa2d822572faf7ce4df")
+             "tdhock/animint@0f0866bdab11c73dba8eba27b7e32775de85b040")
 
 load("variants.RData")
 
@@ -191,6 +191,31 @@ add.legend.vars <- function(dt){
   data.table(dt, legend.vars)
 }
 
+setkey(amplicons, LOCUS_ID)
+setkey(variant.intervals, LOCUS_ID)
+
+amplicons.wide <- variant.intervals[amplicons, ]
+stopifnot(nrow(amplicons) == nrow(amplicons.wide))
+
+regions.wide <- variant.intervals[regions, ]
+stopifnot(nrow(regions) == nrow(regions.wide))
+
+setkey(filtered.variants, LOCUS_ID)
+filtered.variants.wide <- variant.intervals[filtered.variants, ]
+stopifnot(nrow(filtered.variants) == nrow(filtered.variants.wide))
+
+## If the Start/Stop variables contain no more information than the
+## first and last variant positions, then these plots should show
+## straight lines.
+ggplot()+
+  coord_equal()+
+  geom_point(aes(firstVariant, Start),
+             data=amplicons.wide)
+ggplot()+
+  coord_equal()+
+  geom_point(aes(lastVariant, Stop),
+             data=amplicons.wide)
+
 viz <-
   list(errorCurves=ggplot()+
          ggtitle(paste("error curves, select",
@@ -211,7 +236,7 @@ viz <-
                    data=error.curves),
 
        chroms=ggplot()+
-         ggtitle("Sanger sequenced amplicons")+
+         ggtitle("Chromosomal position of Sanger sequenced amplicons")+
          theme_animint(width=600)+
          geom_text(aes(chrom2int(chrom), position/1e3,
                        label=sprintf("%s threshold = %.1f",
@@ -251,41 +276,52 @@ viz <-
          ylab("position on chromosome (kilo bases = kb)"),
 
        variants=ggplot()+
-         ggtitle("Variants in each sanger sequenced amplicon")+
+         ggtitle("Variants in each Sanger sequenced amplicon")+
+         theme_bw()+
          theme_animint(width=1000, height=600)+
          scale_fill_manual(values=fp.fn.colors)+
          scale_y_discrete("amplicon LOCUS_ID", drop=FALSE)+
-         scale_x_continuous("relative position on amplicon",
-                            limits=c(-0.05, 1.05),
-                            breaks=c())+
-         geom_text(aes(normalize(LOCUS_ID, firstVariant), LOCUS_ID,
+         scale_x_continuous("position on amplicon (bases)",
+                            limits=c(-20, 480))+
+         geom_text(aes(0, LOCUS_ID,
+                       clickSelects=LOCUS_ID,
                        showSelected=highly.divergent.regions,
                        showSelected2=annotation,
-                       label=paste0(firstVariant, "_")),
+                       label=paste0(Start, "_")),
                    hjust=1,
-                   data=amplicons)+
-         geom_text(aes(normalize(LOCUS_ID, lastVariant), LOCUS_ID,
+                   size=11,
+                   data=amplicons.wide)+
+         geom_text(aes(430, LOCUS_ID,
+                       clickSelects=LOCUS_ID,
                        showSelected=highly.divergent.regions,
                        showSelected2=annotation,
-                       label=paste0("_", lastVariant, " --- ",
-                                    lastVariant-firstVariant, " bases")),
-                   hjust=0,
-                   data=amplicons)+
-         geom_segment(aes(normalize(LOCUS_ID, firstVariant), LOCUS_ID,
-                          xend=normalize(LOCUS_ID, lastVariant), yend=LOCUS_ID,
+                       label=Stop),
+                   hjust=1,
+                   size=11,
+                   data=amplicons.wide)+
+         geom_text(aes(480, LOCUS_ID,
+                       clickSelects=LOCUS_ID,
+                       showSelected=highly.divergent.regions,
+                       showSelected2=annotation,
+                       label=paste0(bases, " bases")),
+                   hjust=1,
+                   size=11,
+                   data=amplicons.wide)+
+         geom_segment(aes(0, LOCUS_ID,
+                          xend=bases, yend=LOCUS_ID,
                           showSelected=highly.divergent.regions,
                           showSelected2=annotation,
                           clickSelects=LOCUS_ID),
                       size=12,
                       alpha=0.6,
-                      data=amplicons)+
-         geom_segment(aes(normalize(LOCUS_ID, regionStart), LOCUS_ID,
-                          xend=normalize(LOCUS_ID, regionEnd), yend=LOCUS_ID,
+                      data=amplicons.wide)+
+         geom_segment(aes(regionStart-Start, LOCUS_ID,
+                          xend=regionEnd-Start, yend=LOCUS_ID,
                           showSelected=highly.divergent.regions,
                           showSelected2=annotation,
                           color=region.type),
                       size=8,
-                      data=add.legend.vars(regions))+
+                      data=add.legend.vars(regions.wide))+
          scale_color_manual(values=c("#E41A1C", #red
                               "#377EB8", #blue
                               "#4DAF4A", #green
@@ -295,7 +331,7 @@ viz <-
                               "#A65628",
                               "#F781BF",
                                      HDR="black"))+
-         geom_point(aes(normalize(LOCUS_ID, POS), LOCUS_ID,
+         geom_point(aes(POS-Start, LOCUS_ID,
                         tooltip=paste(Coding, Variant_type),
                         showSelected=highly.divergent.regions,
                         showSelected2=annotation,
@@ -304,21 +340,13 @@ viz <-
                     color="black",
                     pch=21,
                     size=4,
-                    data=add.legend.vars(filtered.variants)),
+                    data=add.legend.vars(filtered.variants.wide)),
 
        first=list(filterVar.thresh=best.thresh),
 
        title="Malaria parasite NextGenSeq variant calling errors")
 
 animint2dir(viz, "figure-interactive")
-
-## BUG: metric.name and highly.divergent.regions legend entries do not
-## fade to opacity: 0.5 after clicking.
-
-## BUG: HDR color legend shows fill not stroke!
-
-## BUG: LCR region.type does not show up at first (but it does after
-## clicking the region.type legend).
 
 ##animint2gist(viz)
 

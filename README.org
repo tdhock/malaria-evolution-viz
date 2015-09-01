@@ -8,14 +8,15 @@ http://bl.ocks.org/tdhock/raw/1766985f3c78e4551119/
 
 Plotted QUAL threshold error curves and chromosomes.
 
+** 1 Sept 2015
+
+http://bl.ocks.org/tdhock/raw/df869d491c6f73290d9e/ 
+
+Bugfixes for interactive legends.
+
+Plot amplicon size on the x axis of the third plot.
+
 ** TODO
 
 exclude outliers?
 
-plot error curves for other quality metrics?
-
-dotplots of fp/fn versus chromosomal position for every amplicon
-(maybe facets or showSelected).
-
-plot HDR status as dot outline in chrom plot, and as a shaded band in
-the dotplots.
