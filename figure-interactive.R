@@ -5,10 +5,10 @@ works_with_R("3.2.1",
 
 load("variants.RData")
 
-filterVar <- "DP"
-filterVar <- "QUAL"
-filterVar <- "FQ"
-filterVar <- "MQ"
+filterVar <- "MQ"#map quality, average over reads at that position.
+filterVar <- "QUAL"#how confident? 0 for no SNP.
+filterVar <- "FQ"#consensus quality.
+filterVar <- "DP"#depth
 
 ptab <- table(variants$POS)
 duplicated.pos <- ptab[1 < ptab]
@@ -18,10 +18,13 @@ variants[, `:=`(pos.fac=factor(POS, POS),
                 LOCUS_ID=factor(LOCUS_ID, unique(LOCUS_ID)))]
 variants$filterVar <- variants[[filterVar]]
 
-filterVar.thresh.vec <-
+filterVar.thresh.vec <- if(filterVar=="DP"){
+  seq(0, 200, l=40)
+}else{
   seq(min(variants$filterVar, na.rm=TRUE),
       max(variants$filterVar, na.rm=TRUE),
       l=40)
+}
 
 amp.coding.counts <- with(variants, table(LOCUS_ID, Coding))
 
