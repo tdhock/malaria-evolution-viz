@@ -1,2 +1,5 @@
 *~
 *.RData
+.httr-oauth
+.Rhistory
+Rplots.pdf
