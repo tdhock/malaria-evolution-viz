@@ -226,7 +226,14 @@ viz <- list(
                   color=NA,
                   data=add.filterVar.fac(tallrect.dt)),
   selector.types=list(method="multiple", thresh.type="multiple"),
-  title="3-fold CV estimates variant calling test error"
+  title="3-fold CV estimates variant calling test error",
+  first=with(all.auc[metric.name=="min.error", ], {
+    structure(as.list(threshold), names=paste0(filterVar, "_fold", test.fold))
+  }),
+  duration=with(all.auc[metric.name=="min.error", ], {
+    structure(as.list(rep(2000, length(threshold))),
+              names=paste0(filterVar, "_fold", test.fold))
+  })
 )
 
 viz$error+

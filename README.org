@@ -16,7 +16,21 @@ Bugfixes for interactive legends.
 
 Plot amplicon size on the x axis of the third plot.
 
+** 2 Oct 2015
+
+http://bl.ocks.org/tdhock/raw/c15cd081f6856641cda5/
+
+ROC analysis with algorithms ranked by mean AUC over 3 test folds.
+
 ** TODO
 
-exclude outliers?
+figure-interactive: 
+- add aligned reads plot. (data from bam file)
+- add amplicon sizes.
+- optimal segmentation for identifying HDRs?
+- all bases on Sanger sequenced amplicons which are outside HDR/LCR
+  and are not TP are actually negative examples! Use them to compute
+  FPR and ROC.
+
+
 
