@@ -15,6 +15,8 @@ registerDoParallel()
 
 load("variants.RData")
 
+stop("remove HDR/LCR")
+
 variants$NegFQ <- -variants$FQ
 setkey(variants, LOCUS_ID)
 same.locus <- variants[variants, allow.cartesian=TRUE]

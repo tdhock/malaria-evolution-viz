@@ -1,14 +1,16 @@
 works_with_R("3.2.1",
-             data.table="1.9.5",
+             data.table="1.9.6",
              "tdhock/ggplot2@a8b06ddb680acdcdbd927773b1011c562134e4d2",
-             "tdhock/animint@0f0866bdab11c73dba8eba27b7e32775de85b040")
+             "tdhock/animint@bb18d7b50946bba82c6bb94d77a44c890fe330bb")
 
 load("variants.RData")
 
 filterVar <- "MQ"#map quality, average over reads at that position.
-filterVar <- "QUAL"#how confident? 0 for no SNP.
 filterVar <- "FQ"#consensus quality.
+filterVar <- "Depth"#depth
 filterVar <- "DP"#depth
+filterVar <- "QUAL"#how confident? 0 for no SNP.
+filterVar <- "Quality"#how confident? 0 for no SNP.
 
 ptab <- table(variants$POS)
 duplicated.pos <- ptab[1 < ptab]
@@ -26,51 +28,7 @@ filterVar.thresh.vec <- if(filterVar=="DP"){
       l=40)
 }
 
-amp.coding.counts <- with(variants, table(LOCUS_ID, Coding))
-
-unique.or.multiple <- function(x){
-  u <- unique(paste(x))
-  if(length(u) == 1){
-    u
-  }else{
-    "multiple"
-  }
-}
-
-amplicons <- variants[, .(firstVariant=min(POS),
-                          lastVariant=max(POS),
-                          annotation=unique.or.multiple(Coding),
-                          region.type={
-                            if(all(`HDR/LCR` == ".")){
-                              "."
-                            }else{
-                              not.dot <- `HDR/LCR`[`HDR/LCR` != "."]
-                              ##unique.or.multiple(not.dot)
-                              u <- sort(unique(not.dot))
-                              paste(u, collapse="/")
-                            }
-                          },
-                          chrom=CHROM[1]),
-                      by=LOCUS_ID][, `:=`(
-                        position=as.integer((firstVariant+lastVariant)/2),
-                        highly.divergent.regions=
-                          ifelse(region.type==".", "none", "some")
-                        )]
 setkey(amplicons, LOCUS_ID)
-
-HDR.LCR <- variants[["HDR/LCR"]]
-getRegions <- function(region.type){
-  v.diff <- diff(HDR.LCR==region.type)
-  HDR.starts <- which(v.diff==1)+1
-  HDR.ends <- which(v.diff==-1)
-  LOCUS_ID <- variants$LOCUS_ID[HDR.ends]
-  data.table(LOCUS_ID,
-             regionStart=variants$POS[HDR.starts],
-             regionEnd=variants$POS[HDR.ends],
-             region.type)
-}
-regions <- rbind(getRegions("HDR"), getRegions("LCR"))
-
 normalize <- function(LOCUS_ID, position){
   LID <- paste(LOCUS_ID)
   firstVariant <- amplicons[LID, ]$firstVariant
