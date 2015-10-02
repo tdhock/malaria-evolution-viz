@@ -6,9 +6,7 @@ works_with_R("3.2.2",
              glmnet="1.9.5",
              data.table="1.9.6",
              caret="6.0.41",
-             "tdhock/WeightedROC@1fdd55a7c8d94577071dd393843303d44100c6c1",
-             "tdhock/ggplot2@a8b06ddb680acdcdbd927773b1011c562134e4d2",
-             "tdhock/animint@87a18bb72b475044c1c4809dc6ebb19718bd9fd3")
+             "tdhock/WeightedROC@da53b21f5eccaba513623e43326e5b8061d1c611")
 
 library(parallel)
 library(doParallel)
@@ -18,8 +16,17 @@ registerDoParallel()
 load("variants.RData")
 
 variants$NegFQ <- -variants$FQ
-variants.by.locus <- split(variants, variants$LOCUS_ID)
-stop("compute nearest distance from other variant on the same locus")
+setkey(variants, LOCUS_ID)
+same.locus <- variants[variants, allow.cartesian=TRUE]
+setkey(same.locus, CHROM, POS)
+dist.dt <- same.locus[POS != i.POS, {
+  list(basesToClosest=min(abs(POS-i.POS)))
+}, by=.(CHROM, POS)]
+setkey(dist.dt, CHROM, POS)
+setkey(variants, CHROM, POS)
+variants.wide <- dist.dt[variants]
+
+variants.by.locus <- split(variants.wide, variants.wide$LOCUS_ID)
 
 names(variants.by.locus)
 n.folds <- 3
@@ -28,7 +35,7 @@ locus.fold.vec <- sample(rep(1:n.folds, l=length(variants.by.locus)))
 table(locus.fold.vec)
 
 caret.methods <- c("knn", "rf", "svmRadial", "ada", "gbm", "glmnet")
-all.methods <- c(caret.methods, "CVglmnet")
+all.methods <- c(caret.methods, "glmnetBinDev", "glmnetAcc")
 method.df <- expand.grid(method=all.methods, weight=c("one", "balanced"))
 all.filterVars <- c(with(method.df, {
   paste0(method, ".", weight)
@@ -49,8 +56,14 @@ for(test.fold in 1:n.folds){
     dt$is.INDEL <- ifelse(dt$Variant_type=="INDEL", 1, 0)
     dt$is.HDR <- dt[["HDR/LCR"]]=="HDR"
     dt$is.LCR <- dt[["HDR/LCR"]]=="LCR"
+    dt[, log.basesToClosest := log(basesToClosest)]
+    dt[, log.DP := log(DP)]
+    dt[, log.FQ := log(300+FQ)]
     col.names <-
-      c("MQ", "QUAL", "FQ", "DP",
+      c("MQ", "QUAL",
+        "log.FQ", "FQ",
+        "log.DP", "DP",
+        "log.basesToClosest", "basesToClosest",
         "is.CODING", "is.INTERGENIC", "is.INDEL",
         "is.HDR", "is.LCR")
     as.matrix(dt[, col.names, with=FALSE])
@@ -64,22 +77,38 @@ for(test.fold in 1:n.folds){
   sapply(weight.list, sum)
   for(weight.name in names(weight.list)){
     weight.vec <- weight.list[[weight.name]]
-    glmnet.fit <-
-      cv.glmnet(train.validation.features, not.na$label,
-                weight.vec, family="binomial")
+    glmnet.accuracy <-
+      cv.glmnet(train.validation.features, not.na$label, weight.vec,
+                family="binomial", nfolds=3, type.measure="class")
     not.na$prob <-
-      predict(glmnet.fit, train.validation.features, type="response")
+      predict(glmnet.accuracy, train.validation.features, type="response",
+              s="lambda.min")
     not.na[order(prob),] #higher prob is more likely to be TP.
-    test.variants[[paste0("CVglmnet.", weight.name)]] <-
-      predict(glmnet.fit, test.features, type="response")
+    test.variants[[paste0("glmnetAcc.", weight.name)]] <-
+      predict(glmnet.accuracy, test.features, type="response", s="lambda.min")
+    glmnet.bindev <-
+      cv.glmnet(train.validation.features, not.na$label, weight.vec,
+                family="binomial", nfolds=3)
+    test.variants[[paste0("glmnetBinDev.", weight.name)]] <-
+      predict(glmnet.bindev, test.features, type="response")
     for(method.name in caret.methods){
-      caret.fit <-
-        train(train.validation.features, not.na$label,
-              method = method.name,
-              weights=as.numeric(weight.vec),
-              preProcess = c("center", "scale"),
-              tuneLength = 10,
-              trControl = trainControl(method = "cv"))
+      train.args <- list(
+        train.validation.features, not.na$label,
+        method=method.name,
+        weights=as.numeric(weight.vec),
+        preProcess=c("center", "scale"),
+        trControl=trainControl("cv", 3))
+      if(method.name == "glmnet"){
+        train.args$tuneGrid <-
+          expand.grid(lambda=glmnet.accuracy$lambda, alpha=1)
+      }else if(method.name == "svmRadial"){
+        train.args$tuneGrid <- expand.grid(C=2^seq(-5, 5, l=10),
+                                           sigma=2^seq(-5, 5, l=10))
+        train.args$prob.model <- TRUE
+      }else{
+        train.args$tuneLength <- 10
+      }
+      caret.fit <- do.call(train, train.args)
       caret.name <- paste0(method.name, ".", weight.name)
       test.variants[[caret.name]] <- NA
       test.variants[[caret.name]][!test.is.na] <-
