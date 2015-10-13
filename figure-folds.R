@@ -1,10 +1,11 @@
 works_with_R("3.2.2",
              data.table="1.9.6",
              "tdhock/ggplot2@a8b06ddb680acdcdbd927773b1011c562134e4d2",
-             "tdhock/WeightedROC@da53b21f5eccaba513623e43326e5b8061d1c611",
-             "tdhock/animint@bb18d7b50946bba82c6bb94d77a44c890fe330bb")
+             "tdhock/WeightedROC@3452d61638e16f547f73c1a0f3bf852a3751f29d",
+             "tdhock/animint@61b8aed14e64a95fdbe9dfcd44c80254858305fd")
 
 load("locus.fold.vec.RData")
+
 fold.counts <- 
   data.table(TP=sapply(variants.by.locus, with, sum(Validation=="TP")),
              FP=sapply(variants.by.locus, with, sum(Validation=="FP")),
@@ -22,6 +23,7 @@ for(filterVar.fold in names(roc.by.filterVar.fold)){
                metric.value=c(WeightedAUC(roc), with(best, FP+FN)))
 }
 all.auc <- do.call(rbind, auc.by.filterVar.fold)
+
 method.ranks <- all.auc[metric.name=="auc", {
   .(method.mean=mean(metric.value))
 }, by=method][order(method.mean, decreasing=TRUE),]
@@ -44,6 +46,7 @@ add.filterVar.rev <- function(df){
 all.roc$method <- factor(all.roc$method, rev(unique(paste(all.ranks$method))))
 all.roc$thresh.type <- "selected"
 all.roc$metric.name <- "min.error"
+
 all.auc[, thresh.type := "min error"]
 
 error.fun.list <- list(
@@ -59,24 +62,6 @@ for(error.type in names(error.fun.list)){
 }
 all.error <- do.call(rbind, all.error.list)
 
-method.colors <- 
-c(knn="#8DD3C7", #green
-  "#FFFFB3", #yellow
-  svmRadial="#BEBADA", #pale violet
-  ada="#FB8072", #pink-orange
-  gbm="#FB8072", #pink-orange
-  glmnet="#80B1D3", #blue
-  glmnetBinDev="#80B1D3", #blue
-  glmnetAcc="#80B1D3", #blue
-  MQ="#FDB462", #orange
-  QUAL="#B3DE69", #green
-  NegFQ="#FCCDE5", #pink-violet
-  DP="#D9D9D9", #grey
-  rf="#BC80BD", #purple
-  "#CCEBC5", #greenish yellow
-  "#FFED6F") #gold
-
-
 tallrect.dt <- all.error[error.type=="errors", {
   vals <- threshold
   only.finite <- vals[is.finite(vals)]
@@ -90,8 +75,43 @@ tallrect.dt <- all.error[error.type=="errors", {
              xmin = breaks[-length(breaks)], xmax = breaks[-1])
 }, by=.(filterVar, method, test.fold)]
 tallrect.dt[filterVar=="glmnet.balanced" & test.fold==3,]  
-all.error[filterVar=="glmnet.balanced" & test.fold==3 & error.type=="errors",]  
+all.error[filterVar=="glmnet.balanced" & test.fold==3 & error.type=="errors",]
 
+min.lines <- all.error[error.type=="errors", {
+  list(min.errors=min(error.value))
+}, by=test.fold]
+largest.min.error <- all.auc[metric.name=="min.error", max(metric.value)]
+all.roc$error.or.Inf <- with(all.roc, {
+  ifelse(largest.min.error < FP+FN, Inf, FP+FN)
+})
+
+## Save for creating an animint test.
+## VariantModels <- list(
+##   roc=data.frame(all.roc),
+##   auc=data.frame(all.auc),
+##   error=data.frame(all.error),
+##   ranks=data.frame(all.ranks),
+##   thresholds=data.frame(tallrect.dt),
+##   minima=data.frame(min.lines))
+## save(VariantModels, file="VariantModels.RData")
+
+thresh.colors <- c("min error"="black", selected="white")
+method.colors <- 
+  c(knn="#8DD3C7", #green
+    "#FFFFB3", #yellow
+    svmRadial="#BEBADA", #pale violet
+    ada="#FB8072", #pink-orange
+    gbm="#FB8072", #pink-orange
+    glmnet="#80B1D3", #blue
+    glmnetBinDev="#80B1D3", #blue
+    glmnetAcc="#80B1D3", #blue
+    MQ="#FDB462", #orange
+    QUAL="#B3DE69", #green
+    NegFQ="#FCCDE5", #pink-violet
+    DP="#D9D9D9", #grey
+    rf="#BC80BD", #purple
+    "#CCEBC5", #greenish yellow
+    "#FFED6F") #gold
 fp.fn.colors <- c(FP="skyblue",
                   fp="skyblue",
                   fn="#E41A1C",
@@ -99,21 +119,6 @@ fp.fn.colors <- c(FP="skyblue",
                   tn="white",
                   tp="grey",
                   errors="black")
-fp.fn.linetypes <- c(errors="solid",
-                     false.positive="solid",
-                     false.negative="solid",
-                     imprecision="dashed")
-fp.fn.sizes <- c(errors=1,
-                 false.positive=3,
-                 false.negative=3,
-                 imprecision=1)/1.2
-min.lines <- all.error[error.type=="errors", {
-  list(min.errors=min(error.value))
-}, by=test.fold]
-
-thresh.colors <- c("min error"="black", selected="white")
-
-largest.min.error <- all.auc[metric.name=="min.error", max(metric.value)]
 
 viz <- list(
   auc=ggplot()+
@@ -135,7 +140,7 @@ viz <- list(
                pch=21,
                data=add.filterVar.rev(all.auc))+
     geom_point(aes(
-      ifelse(largest.min.error < FP+FN, Inf, FP+FN),
+      error.or.Inf,
       filterVar.fac, 
       showSelected=test.fold,
       key=filterVar,

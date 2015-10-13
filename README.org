@@ -2,26 +2,6 @@ Visualization of Malaria parasite genome evolution
 
 Collaboration with https://github.com/zmartine
 
-** 30 July 2015
-
-http://bl.ocks.org/tdhock/raw/1766985f3c78e4551119/
-
-Plotted QUAL threshold error curves and chromosomes.
-
-** 1 Sept 2015
-
-http://bl.ocks.org/tdhock/raw/df869d491c6f73290d9e/ 
-
-Bugfixes for interactive legends.
-
-Plot amplicon size on the x axis of the third plot.
-
-** 2 Oct 2015
-
-http://bl.ocks.org/tdhock/raw/c15cd081f6856641cda5/
-
-ROC analysis with algorithms ranked by mean AUC over 3 test folds.
-
 ** TODO
 
 figure-interactive: 
@@ -32,5 +12,30 @@ figure-interactive:
   and are not TP are actually negative examples! Use them to compute
   FPR and ROC.
 
+** 13 Oct 2015
+
+http://bl.ocks.org/tdhock/raw/80f411957fdf39f7e4e1/
+
+ROC curve data viz that loads faster.
+
+** 2 Oct 2015
+
+http://bl.ocks.org/tdhock/raw/c15cd081f6856641cda5/
+
+ROC analysis with algorithms ranked by mean AUC over 3 test folds.
+
+** 1 Sept 2015
+
+http://bl.ocks.org/tdhock/raw/df869d491c6f73290d9e/ 
+
+Bugfixes for interactive legends.
+
+Plot amplicon size on the x axis of the third plot.
+
+** 30 July 2015
+
+http://bl.ocks.org/tdhock/raw/1766985f3c78e4551119/
+
+Plotted QUAL threshold error curves and chromosomes.
 
 
