@@ -4,6 +4,12 @@ original <- fread("N67toYMaug_22Feb13_reflist_2June14_eBAQ_MASTER_NOChr2_fullhom
 names(original)[1] <- "CHROM"
 n.positive <- original[Validation %in% c("FN", "TP"), .N]
 
+variant.intervals <- fread("variant_intervals_for_Toby.txt")
+variant.intervals[, bases := Stop - Start]
+variant.intervals[, LOCUS_ID := factor(LOCUS_ID, LOCUS_ID)]
+
+original[, LOCUS_ID := factor(LOCUS_ID, levels(variant.intervals$LOCUS_ID))]
+
 unique.or.multiple <- function(x){
   u <- unique(paste(x))
   if(length(u) == 1){
@@ -71,10 +77,6 @@ for(vcf.file in vcf.file.vec){
 }
 (count.tab <- do.call(rbind, count.tab.list))
 
-variant.intervals <- fread("variant_intervals_for_Toby.txt")
-variant.intervals[, bases := Stop - Start]
-variant.intervals[, LOCUS_ID := factor(LOCUS_ID, LOCUS_ID)]
-
 no.locus <- vcf.list[["Annotated_viz_VCFs/GATK_Diploid_annotated_viz.vcf"]]
 no.locus[, POS1 := POS ]
 setkey(no.locus, CHROM, POS, POS1)
@@ -86,7 +88,9 @@ variants <- foverlaps(no.locus, only.limits)
 variants$Coding <- "unknown"
 variants$Variant_type <- "unknown"
 
-##variants <- original
+## Comment the next line to use one of the new data files defined in
+## vcf.list above.
+variants <- original
 
 ## "#CHROM - Chromosome name from the reference genome, in the format
 ## of PyYM_##_v1.  The naming convention is organism (genus + species,

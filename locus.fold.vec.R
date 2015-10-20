@@ -6,7 +6,7 @@ works_with_R("3.2.2",
              glmnet="1.9.5",
              data.table="1.9.6",
              caret="6.0.41",
-             "tdhock/WeightedROC@da53b21f5eccaba513623e43326e5b8061d1c611")
+             "tdhock/WeightedROC@3452d61638e16f547f73c1a0f3bf852a3751f29d")
 
 library(parallel)
 library(doParallel)

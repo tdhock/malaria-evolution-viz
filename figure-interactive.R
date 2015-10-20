@@ -1,16 +1,20 @@
-works_with_R("3.2.1",
+works_with_R("3.2.2",
              data.table="1.9.6",
              "tdhock/ggplot2@a8b06ddb680acdcdbd927773b1011c562134e4d2",
-             "tdhock/animint@bb18d7b50946bba82c6bb94d77a44c890fe330bb")
+             "tdhock/animint@a1a8fb8ef7a1747850f144daf3e145b326c9c9ce")
 
 load("variants.RData")
 
+if("FQ" %in% names(variants))variants$NegFQ <- -variants$FQ
+
 filterVar <- "MQ"#map quality, average over reads at that position.
-filterVar <- "FQ"#consensus quality.
 filterVar <- "Depth"#depth
 filterVar <- "DP"#depth
 filterVar <- "QUAL"#how confident? 0 for no SNP.
 filterVar <- "Quality"#how confident? 0 for no SNP.
+filterVar <- "NegFQ"#consensus quality.
+
+stopifnot(filterVar %in% names(variants))
 
 ptab <- table(variants$POS)
 duplicated.pos <- ptab[1 < ptab]
@@ -163,6 +167,7 @@ stopifnot(nrow(regions) == nrow(regions.wide))
 
 setkey(filtered.variants, LOCUS_ID)
 filtered.variants.wide <- variant.intervals[filtered.variants, ]
+filtered.variants.wide[, metric.name := ifelse(Validation=="FP", "fp", "fn")]
 stopifnot(nrow(filtered.variants) == nrow(filtered.variants.wide))
 
 ## If the Start/Stop variables contain no more information than the
@@ -176,6 +181,13 @@ ggplot()+
   coord_equal()+
   geom_point(aes(lastVariant, Stop),
              data=amplicons.wide)
+
+errors.by.metric <- list()
+for(metric.name in c("fp", "fn")){
+  non.zero <- amplicon.errors[[metric.name]] != 0
+  errors.by.metric[[metric.name]] <-
+    data.table(metric.name, amplicon.errors[non.zero,])
+}
 
 viz <-
   list(errorCurves=ggplot()+
@@ -208,20 +220,22 @@ viz <-
                        label=paste(fp, "fp_"),
                        clickSelects=LOCUS_ID,
                        showSelected3=annotation,
+                       showSelected4=metric.name,
                        showSelected2=highly.divergent.regions,
                        showSelected=filterVar.thresh),
                    hjust=1,
                    color=fp.fn.colors[["fp"]],
-                   data=subset(amplicon.errors, fp != 0))+
+                   data=errors.by.metric$fp)+
          geom_text(aes(chrom2int(chrom), position/1e3,
                        label=paste0("_" , fn, " fn"),
                        clickSelects=LOCUS_ID,
                        showSelected3=annotation,
+                       showSelected4=metric.name,
                        showSelected2=highly.divergent.regions,
                        showSelected=filterVar.thresh),
                    color=fp.fn.colors[["fn"]],
                    hjust=0,
-                   data=subset(amplicon.errors, fn != 0))+
+                   data=errors.by.metric$fn)+
          geom_segment(aes(chrom2int(chrom), 0, 
                           yend=bases/1e3, xend=chrom2int(chrom)),
                       data=YM_Chr)+
@@ -296,6 +310,7 @@ viz <-
                         tooltip=paste(Coding, Variant_type),
                         showSelected=highly.divergent.regions,
                         showSelected2=annotation,
+                        showSelected4=metric.name,
                         showSelected3=filterVar.thresh,
                         fill=error.type),
                     color="black",

@@ -2,7 +2,7 @@ works_with_R("3.2.2",
              data.table="1.9.6",
              "tdhock/ggplot2@a8b06ddb680acdcdbd927773b1011c562134e4d2",
              "tdhock/WeightedROC@3452d61638e16f547f73c1a0f3bf852a3751f29d",
-             "tdhock/animint@61b8aed14e64a95fdbe9dfcd44c80254858305fd")
+             "tdhock/animint@a1a8fb8ef7a1747850f144daf3e145b326c9c9ce")
 
 load("locus.fold.vec.RData")
 
